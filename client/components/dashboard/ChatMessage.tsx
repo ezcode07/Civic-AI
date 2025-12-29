@@ -1,4 +1,5 @@
 "use client";
+import React from 'react';
 
 interface Message {
   id: string;
@@ -18,7 +19,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
   const renderContent = (content: string) => {
     const lines = content.split('\n');
-    const elements: JSX.Element[] = [];
+    const elements: React.ReactNode[] = [];
     let currentIndex = 0;
 
     lines.forEach((line, index) => {

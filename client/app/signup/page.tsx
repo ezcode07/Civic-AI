@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
@@ -16,6 +17,7 @@ export default function SignUpPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { signup } = useAuth();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -70,13 +72,22 @@ export default function SignUpPage() {
     if (validateForm()) {
       setIsLoading(true);
       
-      // Simulate sign up process
-      setTimeout(() => {
-        console.log("Sign up attempt:", formData);
+      try {
+        const result = await signup(formData.fullName, formData.email, formData.password);
+        
+        if (result.success) {
+          // Redirect to dashboard on successful signup
+          router.push("/dashboard");
+        } else {
+          // Show error message
+          setErrors({ general: result.error || "Account creation failed. Please try again." });
+        }
+      } catch (error) {
+        console.error("Signup error:", error);
+        setErrors({ general: "An unexpected error occurred. Please try again." });
+      } finally {
         setIsLoading(false);
-        // Redirect to dashboard on successful signup
-        router.push("/dashboard");
-      }, 1000);
+      }
     }
   };
 
@@ -106,6 +117,13 @@ export default function SignUpPage() {
 
           {/* Sign Up Form */}
           <div className="bg-white p-8 md:p-10 rounded-xl shadow-lg border border-gray-100">
+            {/* General Error Message */}
+            {errors.general && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{errors.general}</p>
+              </div>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Full Name Field */}
               <div>

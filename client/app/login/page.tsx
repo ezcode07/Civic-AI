@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -54,13 +56,22 @@ export default function LoginPage() {
     if (validateForm()) {
       setIsLoading(true);
       
-      // Simulate login process
-      setTimeout(() => {
-        console.log("Login attempt:", formData);
+      try {
+        const result = await login(formData.email, formData.password);
+        
+        if (result.success) {
+          // Redirect to dashboard on successful login
+          router.push("/dashboard");
+        } else {
+          // Show error message
+          setErrors({ general: result.error || "Login failed. Please try again." });
+        }
+      } catch (error) {
+        console.error("Login error:", error);
+        setErrors({ general: "An unexpected error occurred. Please try again." });
+      } finally {
         setIsLoading(false);
-        // Redirect to dashboard on successful login
-        router.push("/dashboard");
-      }, 1000);
+      }
     }
   };
 
@@ -86,6 +97,13 @@ export default function LoginPage() {
 
           {/* Login Form */}
           <div className="bg-white p-8 md:p-10 rounded-xl shadow-lg border border-gray-100">
+            {/* General Error Message */}
+            {errors.general && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{errors.general}</p>
+              </div>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Email Field */}
               <div>

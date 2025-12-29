@@ -38,6 +38,19 @@ if not supabase_url or not supabase_anon_key:
 
 supabase: Client = create_client(supabase_url, supabase_anon_key)
 
+# Initialize Supabase Admin client (for bypassing RLS)
+supabase_service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase_admin: Optional[Client] = None
+
+if supabase_service_role_key:
+    try:
+        supabase_admin = create_client(supabase_url, supabase_service_role_key)
+        logger.info("Supabase Admin client initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase Admin client: {e}")
+else:
+    logger.warning("SUPABASE_SERVICE_ROLE_KEY not set. Admin operations may fail due to RLS.")
+
 # Initialize OpenAI (optional - for better AI responses)
 openai_api_key = os.getenv("OPENAI_API_KEY")
 openai_client = None
@@ -103,7 +116,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             )
         
         # Get user profile from database
-        profile_response = supabase.table("users").select("*").eq("id", user_response.user.id).execute()
+        if supabase_admin:
+            profile_response = supabase_admin.table("users").select("*").eq("id", user_response.user.id).execute()
+        else:
+            profile_response = supabase.table("users").select("*").eq("id", user_response.user.id).execute()
         
         if not profile_response.data:
             raise HTTPException(
@@ -219,6 +235,27 @@ async def signup(request: SignUpRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to create user account"
             )
+            
+        # Auto-confirm email if admin client is available (Hackathon mode)
+        session = auth_response.session
+        if supabase_admin:
+            try:
+                logger.info(f"Auto-confirming email for user {auth_response.user.id}")
+                supabase_admin.auth.admin.update_user_by_id(
+                    auth_response.user.id,
+                    {"email_confirm": True}
+                )
+                
+                # If session is missing (due to email confirmation requirement), try to login now
+                if not session:
+                    # Login to get the session
+                    login_response = supabase.auth.sign_in_with_password({
+                        "email": request.email,
+                        "password": request.password
+                    })
+                    session = login_response.session
+            except Exception as e:
+                logger.warning(f"Failed to auto-confirm email or login: {e}")
         
         # Store user profile in database
         user_data = {
@@ -227,7 +264,13 @@ async def signup(request: SignUpRequest):
             "email": request.email
         }
         
-        profile_response = supabase.table("users").insert(user_data).execute()
+        # Use admin client if available to bypass RLS
+        if supabase_admin:
+            profile_response = supabase_admin.table("users").insert(user_data).execute()
+        else:
+            # Fallback to anon client (will likely fail with RLS)
+            logger.warning("Using anon client for user profile creation. This may fail due to RLS.")
+            profile_response = supabase.table("users").insert(user_data).execute()
         
         if not profile_response.data:
             # If profile creation fails, we should ideally clean up the auth user
@@ -238,7 +281,7 @@ async def signup(request: SignUpRequest):
             )
         
         return AuthResponse(
-            access_token=auth_response.session.access_token if auth_response.session else "",
+            access_token=session.access_token if session else "",
             user={
                 "id": auth_response.user.id,
                 "email": auth_response.user.email,
@@ -278,7 +321,10 @@ async def login(request: LoginRequest):
             )
         
         # Get user profile
-        profile_response = supabase.table("users").select("*").eq("id", auth_response.user.id).execute()
+        if supabase_admin:
+            profile_response = supabase_admin.table("users").select("*").eq("id", auth_response.user.id).execute()
+        else:
+            profile_response = supabase.table("users").select("*").eq("id", auth_response.user.id).execute()
         
         user_profile = profile_response.data[0] if profile_response.data else {}
         
