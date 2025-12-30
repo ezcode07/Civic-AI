@@ -227,7 +227,7 @@ export default function SignUpPage() {
                 disabled={!isFormValid || isLoading}
                 className={`w-full py-4 md:py-5 px-8 rounded-xl text-lg md:text-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   isFormValid && !isLoading
-                    ? "bg-black text-white hover:bg-gray-800 hover:shadow-xl hover:scale-[1.02] focus:ring-gray-500"
+                    ? "bg-black text-white hover:bg-gray-800 hover:shadow-xl hover:scale-[1.02] focus:ring-gray-500 cursor-pointer"
                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
@@ -260,7 +260,7 @@ export default function SignUpPage() {
                 Already have an account?{" "}
                 <Link
                   href="/login"
-                  className="font-semibold text-black hover:text-gray-800 transition-colors duration-200 underline underline-offset-2"
+                  className="font-semibold text-black hover:text-gray-800 transition-colors duration-200 underline underline-offset-2 cursor-pointer"
                 >
                   Login
                 </Link>

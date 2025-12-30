@@ -7,9 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from typing import Optional
 import logging
-import pytesseract
 from PIL import Image
 import io
+import platform
 
 # Load environment variables first
 load_dotenv()
@@ -95,12 +95,27 @@ class UserResponse(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     language: str = "en"
+    chat_id: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+
+class MessageResponse(BaseModel):
+    id: str
+    chat_id: str
+    sender: str
+    content: str
+    created_at: str
 
 class OCRResponse(BaseModel):
     extracted_text: str
     ai_explanation: str
     language: str
     status: str
+    chat_id: Optional[str] = None
 
 # Auth Helper Functions
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -147,30 +162,31 @@ def generate_ai_response(text: str, language: str = "en") -> str:
     """
     try:
         if gemini_api_key:
-            # Use Gemini for responses
-            model = genai.GenerativeModel('gemini-pro')
+            # Use Gemini for responses - using gemini-1.5-flash for better performance
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt = f"""
-            You are Civic-AI, an AI assistant that helps citizens understand government schemes, legal notices, and public services in India.
+            You are Civic-AI, an expert AI assistant dedicated to helping citizens understand government schemes, legal notices, and public services in India.
             
-            Please explain the following text in simple, easy-to-understand language:
+            Your task is to explain the following text in simple, clear, and easy-to-understand language.
             
-            Text: {text}
+            Input Text:
+            "{text}"
             
-            Instructions:
-            - Use simple language that a common citizen can understand
-            - Use bullet points for key information
-            - Avoid legal jargon
-            - Focus on practical implications
-            - If it's about a government scheme, mention eligibility and how to apply
-            - If it's a legal notice, explain what it means for the citizen
-            - Keep the response helpful and actionable
-            - Respond in {language} if possible, otherwise in English
+            Response Guidelines:
+            1. **Simplify**: Use plain language. Avoid complex legal or bureaucratic jargon.
+            2. **Structure**: Use clear headings and bullet points.
+            3. **Actionable**: Highlight what the user needs to do (e.g., deadlines, documents needed, where to apply).
+            4. **Context**: Explain *why* this is important.
+            5. **Language**: Respond in {language}. If the requested language is not supported, respond in English.
+            
+            Format your response in Markdown.
             """
             
             response = model.generate_content(prompt)
             return response.text
         else:
+            logger.warning("Gemini API key missing during request. Using fallback.")
             # Fallback response without Gemini
             return generate_fallback_response(text, language)
     
@@ -182,35 +198,22 @@ def generate_fallback_response(text: str, language: str = "en") -> str:
     """
     Generate a fallback response when Gemini is not available
     """
-    return f"""# Document Analysis
+    return f"""# Service Notice
 
-## Extracted Text
-{text[:500]}{'...' if len(text) > 500 else ''}
+**Note:** The AI processing service is currently unavailable (API Key missing or connection error). 
 
-## AI Analysis
-I've extracted the text from your document. Here's what I can help you understand:
+However, we have successfully received your input.
 
-## Key Points
-• This appears to be a government or legal document
-• The text contains important information that may affect your rights or benefits
-• You may need to take specific actions based on this document
+## Extracted/Received Text
+> {text[:300]}{'...' if len(text) > 300 else ''}
 
-## Recommendations
-1. **Read Carefully**: Review all the details in the extracted text
-2. **Check Deadlines**: Look for any important dates or deadlines
-3. **Verify Eligibility**: If this is about a scheme or benefit, check if you qualify
-4. **Seek Help**: Contact local government offices if you need clarification
-5. **Keep Records**: Save a copy of this document for your records
+## What you can do next:
+1. **Review the text** above to ensure it was captured correctly.
+2. **Try again later** when the AI service is restored.
+3. **Consult official sources** for critical information.
 
-## Next Steps
-• Visit the relevant government website for more information
-• Contact the issuing authority if you have questions
-• Apply for benefits or respond to notices as required
-
-**Language**: {language}
-**Source**: Document Analysis by Civic-AI
-
-*For more detailed analysis, please ensure all text is clearly visible in the uploaded image.*"""
+*System Message: Please check the server logs and configuration.*
+"""
 
 # Routes
 @app.get("/")
@@ -361,10 +364,119 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"]
     )
 
+# Chat Routes
+@app.get("/api/chats", response_model=list[ChatResponse])
+async def get_chats(current_user: dict = Depends(get_current_user)):
+    """
+    Get all chats for the current user
+    """
+    try:
+        if supabase_admin:
+            response = supabase_admin.table("chats").select("*").eq("user_id", current_user["id"]).order("updated_at", desc=True).execute()
+        else:
+            response = supabase.table("chats").select("*").eq("user_id", current_user["id"]).order("updated_at", desc=True).execute()
+        
+        return response.data
+    except Exception as e:
+        logger.error(f"Get chats error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch chats"
+        )
+
+@app.post("/api/chats", response_model=ChatResponse)
+async def create_chat(current_user: dict = Depends(get_current_user)):
+    """
+    Create a new chat session
+    """
+    try:
+        chat_data = {
+            "user_id": current_user["id"],
+            "title": "New Conversation"
+        }
+        
+        if supabase_admin:
+            response = supabase_admin.table("chats").insert(chat_data).execute()
+        else:
+            response = supabase.table("chats").insert(chat_data).execute()
+            
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Failed to create chat")
+            
+        return response.data[0]
+    except Exception as e:
+        logger.error(f"Create chat error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create chat"
+        )
+
+@app.get("/api/chats/{chat_id}/messages", response_model=list[MessageResponse])
+async def get_chat_messages(chat_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Get all messages for a specific chat
+    """
+    try:
+        # Verify chat ownership
+        if supabase_admin:
+            chat_check = supabase_admin.table("chats").select("id").eq("id", chat_id).eq("user_id", current_user["id"]).execute()
+        else:
+            chat_check = supabase.table("chats").select("id").eq("id", chat_id).eq("user_id", current_user["id"]).execute()
+            
+        if not chat_check.data:
+            raise HTTPException(status_code=404, detail="Chat not found")
+
+        if supabase_admin:
+            response = supabase_admin.table("messages").select("*").eq("chat_id", chat_id).order("created_at", desc=False).execute()
+        else:
+            response = supabase.table("messages").select("*").eq("chat_id", chat_id).order("created_at", desc=False).execute()
+            
+        return response.data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get messages error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch messages"
+        )
+
+@app.delete("/api/chats/{chat_id}")
+async def delete_chat(chat_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Delete a specific chat and all its messages
+    """
+    try:
+        # Verify chat ownership
+        if supabase_admin:
+            chat_check = supabase_admin.table("chats").select("id").eq("id", chat_id).eq("user_id", current_user["id"]).execute()
+        else:
+            chat_check = supabase.table("chats").select("id").eq("id", chat_id).eq("user_id", current_user["id"]).execute()
+            
+        if not chat_check.data:
+            raise HTTPException(status_code=404, detail="Chat not found or access denied")
+
+        # Delete chat (messages will cascade delete due to foreign key constraint)
+        if supabase_admin:
+            supabase_admin.table("chats").delete().eq("id", chat_id).execute()
+        else:
+            supabase.table("chats").delete().eq("id", chat_id).execute()
+            
+        return {"message": "Chat deleted successfully", "id": chat_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete chat error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete chat"
+        )
+
 @app.post("/api/ocr", response_model=OCRResponse)
 async def process_image_ocr(
     file: UploadFile = File(...),
     language: str = "en",
+    chat_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -387,7 +499,21 @@ async def process_image_ocr(
                 detail="Uploaded file is empty"
             )
         
-        # Process image with OCR
+        # Create chat if not provided
+        active_chat_id = chat_id
+        if not active_chat_id:
+            try:
+                chat_data = {"user_id": current_user["id"], "title": "Image Analysis"}
+                if supabase_admin:
+                    chat_res = supabase_admin.table("chats").insert(chat_data).execute()
+                else:
+                    chat_res = supabase.table("chats").insert(chat_data).execute()
+                if chat_res.data:
+                    active_chat_id = chat_res.data[0]["id"]
+            except Exception as e:
+                logger.error(f"Failed to create auto-chat: {e}")
+
+        # Process image with Gemini Vision
         try:
             image = Image.open(io.BytesIO(image_data))
             
@@ -395,32 +521,83 @@ async def process_image_ocr(
             if image.mode != 'RGB':
                 image = image.convert('RGB')
             
-            # Extract text using pytesseract
-            extracted_text = pytesseract.image_to_string(image, lang='eng')
+            if gemini_api_key:
+                # Use Gemini Vision for direct image analysis
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                prompt = f"""
+                You are Civic-AI, an expert AI assistant.
+                
+                Please analyze this image of a government document or notice.
+                
+                Return a JSON response with two fields:
+                1. "extracted_text": The full text extracted from the image.
+                2. "explanation": A simple, clear explanation of what the document is about, including key actions, dates, or requirements.
+                
+                The "explanation" should be in {language} and formatted in Markdown.
+                """
+                
+                response = model.generate_content([prompt, image], generation_config={"response_mime_type": "application/json"})
+                
+                try:
+                    import json
+                    response_data = json.loads(response.text)
+                    extracted_text = response_data.get("extracted_text", "Text could not be extracted.")
+                    ai_explanation = response_data.get("explanation", "Analysis could not be generated.")
+                except Exception as json_error:
+                    logger.error(f"JSON parsing error: {json_error}")
+                    extracted_text = "Error parsing AI response."
+                    ai_explanation = response.text # Fallback to raw text
+            else:
+                # Fallback if no API key
+                extracted_text = "AI Service Unavailable"
+                ai_explanation = "Please configure the GEMINI_API_KEY to enable image analysis."
             
-            if not extracted_text.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No text could be extracted from the image. Please ensure the image contains clear, readable text."
-                )
-            
-            # Generate AI explanation
-            ai_explanation = generate_ai_response(extracted_text, language)
-            
-            logger.info(f"OCR processed successfully for user {current_user['id']}")
+            # Save messages to database if we have a chat_id
+            if active_chat_id:
+                try:
+                    # Save User Message (Image + Extracted Text)
+                    user_content = f"📷 **Image Uploaded:** {file.filename}\n\n**Extracted Text:**\n> {extracted_text[:500]}{'...' if len(extracted_text) > 500 else ''}"
+                    
+                    user_msg = {
+                        "chat_id": active_chat_id,
+                        "sender": "user",
+                        "content": user_content
+                    }
+                    
+                    # Save AI Message
+                    ai_msg = {
+                        "chat_id": active_chat_id,
+                        "sender": "ai",
+                        "content": ai_explanation
+                    }
+                    
+                    if supabase_admin:
+                        supabase_admin.table("messages").insert([user_msg, ai_msg]).execute()
+                        # Update chat title based on first message if needed, or just update timestamp
+                        supabase_admin.table("chats").update({"updated_at": "now()"}).eq("id", active_chat_id).execute()
+                    else:
+                        supabase.table("messages").insert([user_msg, ai_msg]).execute()
+                        supabase.table("chats").update({"updated_at": "now()"}).eq("id", active_chat_id).execute()
+                        
+                except Exception as db_error:
+                    logger.error(f"Failed to save messages: {db_error}")
+
+            logger.info(f"Image processed successfully for user {current_user['id']}")
             
             return OCRResponse(
-                extracted_text=extracted_text.strip(),
+                extracted_text=extracted_text,
                 ai_explanation=ai_explanation,
                 language=language,
-                status="success"
+                status="success",
+                chat_id=active_chat_id
             )
             
         except Exception as ocr_error:
-            logger.error(f"OCR processing error: {str(ocr_error)}")
+            logger.error(f"Image processing error: {str(ocr_error)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to process the image. Please ensure the image is clear and contains readable text."
+                detail="Failed to process the image. Please ensure the image is clear."
             )
     
     except HTTPException:
@@ -444,8 +621,53 @@ async def ask_ai(data: QueryRequest, current_user: dict = Depends(get_current_us
                 detail="Question cannot be empty"
             )
         
+        # Create chat if not provided
+        active_chat_id = data.chat_id
+        if not active_chat_id:
+            try:
+                # Generate a title from the first few words of the question
+                title = " ".join(data.question.split()[:5]) + "..."
+                chat_data = {"user_id": current_user["id"], "title": title}
+                
+                if supabase_admin:
+                    chat_res = supabase_admin.table("chats").insert(chat_data).execute()
+                else:
+                    chat_res = supabase.table("chats").insert(chat_data).execute()
+                    
+                if chat_res.data:
+                    active_chat_id = chat_res.data[0]["id"]
+            except Exception as e:
+                logger.error(f"Failed to create auto-chat: {e}")
+
         # Generate AI response
         ai_response = generate_ai_response(data.question, data.language)
+        
+        # Save messages to database if we have a chat_id
+        if active_chat_id:
+            try:
+                # Save User Message
+                user_msg = {
+                    "chat_id": active_chat_id,
+                    "sender": "user",
+                    "content": data.question
+                }
+                
+                # Save AI Message
+                ai_msg = {
+                    "chat_id": active_chat_id,
+                    "sender": "ai",
+                    "content": ai_response
+                }
+                
+                if supabase_admin:
+                    supabase_admin.table("messages").insert([user_msg, ai_msg]).execute()
+                    supabase_admin.table("chats").update({"updated_at": "now()"}).eq("id", active_chat_id).execute()
+                else:
+                    supabase.table("messages").insert([user_msg, ai_msg]).execute()
+                    supabase.table("chats").update({"updated_at": "now()"}).eq("id", active_chat_id).execute()
+                    
+            except Exception as db_error:
+                logger.error(f"Failed to save messages: {db_error}")
         
         logger.info(f"Query processed successfully for user {current_user['id']}")
         
@@ -453,6 +675,7 @@ async def ask_ai(data: QueryRequest, current_user: dict = Depends(get_current_us
             "answer": ai_response,
             "language": data.language,
             "user_id": current_user["id"],
+            "chat_id": active_chat_id,
             "timestamp": "2024-12-29T12:00:00Z",
             "status": "success"
         }
@@ -500,4 +723,37 @@ $$ language 'plpgsql';
 
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE chats (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
+    sender TEXT NOT NULL CHECK (sender IN ('user', 'ai')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for chats and messages
+ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+CREATE POLICY "Users can access their own chats" ON chats
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can access messages in their chats" ON messages
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM chats
+            WHERE chats.id = messages.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
 """

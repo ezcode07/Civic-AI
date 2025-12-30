@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
 interface Chat {
   id: string;
@@ -11,9 +13,10 @@ interface Chat {
 
 interface SidebarProps {
   chats: Chat[];
-  activeChat: string;
+  activeChat: string | null;
   onChatSelect: (chatId: string) => void;
   onNewChat: () => void;
+  onDeleteChat: (chatId: string) => Promise<void> | void;
   selectedLanguage: string;
   onLanguageChange: (language: string) => void;
 }
@@ -50,10 +53,39 @@ export default function Sidebar({
   activeChat,
   onChatSelect,
   onNewChat,
+  onDeleteChat,
   selectedLanguage,
   onLanguageChange
 }: SidebarProps) {
   const { logout } = useAuth();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteClick = (chatId: string) => {
+    setChatToDelete(chatId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (chatToDelete) {
+      setIsDeleting(true);
+      try {
+        await onDeleteChat(chatToDelete);
+      } catch (error) {
+        console.error("Delete failed", error);
+      } finally {
+        setIsDeleting(false);
+        setIsDeleteModalOpen(false);
+        setChatToDelete(null);
+      }
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setChatToDelete(null);
+  };
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -71,7 +103,7 @@ export default function Sidebar({
       <div className="p-4 border-b border-gray-200">
         <button
           onClick={onNewChat}
-          className="w-full bg-black text-white py-3 px-4 rounded-xl font-semibold hover:bg-gray-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+          className="w-full bg-black text-white py-3 px-4 rounded-xl font-semibold hover:bg-gray-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer"
         >
           <span className="flex items-center justify-center">
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,29 +120,42 @@ export default function Sidebar({
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Recent Queries</h3>
           <div className="space-y-2">
             {chats.map((chat) => (
-              <button
-                key={chat.id}
-                onClick={() => onChatSelect(chat.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                  activeChat === chat.id
-                    ? "bg-white shadow-sm border border-gray-200"
-                    : "hover:bg-gray-100"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {chat.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formatTime(chat.lastUpdated)}
-                    </p>
+              <div key={chat.id} className="group relative">
+                <button
+                  onClick={() => onChatSelect(chat.id)}
+                  className={`w-full text-left p-3 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 pr-10 cursor-pointer ${
+                    activeChat === chat.id
+                      ? "bg-white shadow-sm border border-gray-200"
+                      : "hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {chat.title}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatTime(chat.lastUpdated)}
+                      </p>
+                    </div>
+                    {activeChat === chat.id && (
+                      <div className="w-2 h-2 bg-blue-600 rounded-full ml-2 mt-2"></div>
+                    )}
                   </div>
-                  {activeChat === chat.id && (
-                    <div className="w-2 h-2 bg-blue-600 rounded-full ml-2 mt-2"></div>
-                  )}
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(chat.id);
+                  }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer"
+                  title="Delete chat"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -123,7 +168,7 @@ export default function Sidebar({
           <select
             value={selectedLanguage}
             onChange={(e) => onLanguageChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white text-gray-800"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white text-gray-800 cursor-pointer"
           >
             {languages.map((language) => (
               <option key={language} value={language} className="text-gray-800">
@@ -137,7 +182,7 @@ export default function Sidebar({
           <h3 className="text-sm font-semibold text-gray-700 mb-2">State</h3>
           <select
             defaultValue="All India"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white text-gray-800"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white text-gray-800 cursor-pointer"
           >
             {states.map((state) => (
               <option key={state} value={state} className="text-gray-800">
@@ -150,7 +195,7 @@ export default function Sidebar({
         {/* Logout */}
         <button
           onClick={logout}
-          className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1"
+          className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 cursor-pointer"
         >
           <span className="flex items-center">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,6 +205,15 @@ export default function Sidebar({
           </span>
         </button>
       </div>
+
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        title="Delete Chat?"
+        message="This action will permanently delete this chat and all associated messages. This cannot be undone."
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

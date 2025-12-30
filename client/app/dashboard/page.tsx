@@ -24,8 +24,7 @@ interface Chat {
 export default function Dashboard() {
   
   const [chats, setChats] = useState<Chat[]>([]);
-
-  const [activeChat, setActiveChat] = useState<string>("1");
+  const [activeChat, setActiveChat] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("English");
@@ -36,9 +35,62 @@ export default function Dashboard() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Fetch chats on mount
+  useEffect(() => {
+    fetchChats();
+  }, []);
+
+  // Fetch messages when active chat changes
+  useEffect(() => {
+    if (activeChat) {
+      fetchMessages(activeChat);
+    }
+  }, [activeChat]);
+
   useEffect(() => {
     scrollToBottom();
   }, [chats, activeChat]);
+
+  const fetchChats = async () => {
+    try {
+      const response = await api.get("/api/chats");
+      const fetchedChats = response.data.map((chat: any) => ({
+        id: chat.id,
+        title: chat.title,
+        messages: [],
+        lastUpdated: new Date(chat.updated_at)
+      }));
+      setChats(fetchedChats);
+      
+      if (fetchedChats.length > 0 && !activeChat) {
+        setActiveChat(fetchedChats[0].id);
+      } else if (fetchedChats.length === 0) {
+        setActiveChat(null);
+      }
+    } catch (error) {
+      console.error("Failed to fetch chats:", error);
+    }
+  };
+
+  const fetchMessages = async (chatId: string) => {
+    try {
+      const response = await api.get(`/api/chats/${chatId}/messages`);
+      const messages = response.data.map((msg: any) => ({
+        id: msg.id,
+        type: msg.sender,
+        content: msg.content,
+        timestamp: new Date(msg.created_at)
+      }));
+      
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId 
+          ? { ...chat, messages: messages }
+          : chat
+      ));
+    } catch (error) {
+      console.error("Failed to fetch messages:", error);
+    }
+  };
 
   const getCurrentChat = () => {
     return chats.find(chat => chat.id === activeChat);
@@ -47,19 +99,19 @@ export default function Dashboard() {
   const handleSendMessage = async (message: string) => {
     if ((!message.trim() && !selectedImage) || isLoading) return;
 
-    // Create user message
+    // Optimistic update
+    const tempId = Date.now().toString();
     const userContent = selectedImage 
       ? `📷 **Image uploaded:** ${selectedImage.name}${message.trim() ? `\n\n**Question:** ${message}` : ''}`
       : message;
 
     const newMessage: Message = {
-      id: Date.now().toString(),
+      id: tempId,
       type: "user",
       content: userContent,
       timestamp: new Date()
     };
 
-    // Add user message
     setChats(prev => prev.map(chat => 
       chat.id === activeChat 
         ? { ...chat, messages: [...chat.messages, newMessage], lastUpdated: new Date() }
@@ -73,51 +125,46 @@ export default function Dashboard() {
       let response;
 
       if (selectedImage) {
-        // Handle image upload with OCR
         const formData = new FormData();
         formData.append('file', selectedImage);
         formData.append('language', selectedLanguage.split(" ")[0].toLowerCase());
+        if (activeChat) {
+          formData.append('chat_id', activeChat);
+        }
 
         response = await api.post("/api/ocr", formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
-
-        // Clear selected image after successful upload
-        setSelectedImage(null);
       } else {
-        // Handle text query
         response = await api.post("/api/query", {
           question: message,
-          language: selectedLanguage.split(" ")[0].toLowerCase()
+          language: selectedLanguage.split(" ")[0].toLowerCase(),
+          chat_id: activeChat
         });
       }
 
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "ai",
-        content: selectedImage 
-          ? response.data.ai_explanation || "I couldn't process the image. Please try again."
-          : response.data.answer || "I apologize, but I couldn't process your request at the moment. Please try again.",
-        timestamp: new Date()
-      };
+      // Refresh messages to get the real IDs and AI response from DB
+      if (activeChat) {
+        await fetchMessages(activeChat);
+        // Also refresh chat list to update timestamps/titles
+        fetchChats();
+      } else if (response.data.chat_id) {
+        // If it was a new chat (no activeChat), set it now
+        await fetchChats();
+        setActiveChat(response.data.chat_id);
+      }
 
-      setChats(prev => prev.map(chat => 
-        chat.id === activeChat 
-          ? { ...chat, messages: [...chat.messages, aiResponse], lastUpdated: new Date() }
-          : chat
-      ));
+      setSelectedImage(null);
 
     } catch (error: any) {
       console.error("API Error:", error);
       
-      let errorMessage = "I'm sorry, I'm having trouble connecting to the server right now. Please check your connection and try again.";
+      let errorMessage = "I'm sorry, I'm having trouble connecting to the server right now.";
       
       if (error.response?.status === 400) {
-        errorMessage = error.response.data.detail || "Please check your input and try again.";
-      } else if (error.response?.status === 401) {
-        errorMessage = "Your session has expired. Please log in again.";
+        errorMessage = error.response.data.detail || "Please check your input.";
       }
       
       const errorResponse: Message = {
@@ -132,9 +179,6 @@ export default function Dashboard() {
           ? { ...chat, messages: [...chat.messages, errorResponse], lastUpdated: new Date() }
           : chat
       ));
-
-      // Clear selected image on error
-      setSelectedImage(null);
     } finally {
       setIsLoading(false);
     }
@@ -149,16 +193,26 @@ export default function Dashboard() {
   };
 
   const handleNewChat = () => {
-    const newChat: Chat = {
-      id: Date.now().toString(),
-      title: "New Conversation",
-      messages: [],
-      lastUpdated: new Date()
-    };
+    setActiveChat(null);
+    setSelectedImage(null);
+    setInputValue("");
+  };
 
-    setChats(prev => [newChat, ...prev]);
-    setActiveChat(newChat.id);
-    setSelectedImage(null); // Clear any selected image
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      await api.delete(`/api/chats/${chatId}`);
+      
+      // Remove chat from local state
+      setChats(prev => prev.filter(chat => chat.id !== chatId));
+      
+      // If deleted chat was active, switch to new chat mode
+      if (activeChat === chatId) {
+        handleNewChat();
+      }
+    } catch (error) {
+      console.error("Failed to delete chat:", error);
+      alert("Failed to delete chat. Please try again.");
+    }
   };
 
   return (
@@ -185,6 +239,7 @@ export default function Dashboard() {
             activeChat={activeChat}
             onChatSelect={setActiveChat}
             onNewChat={handleNewChat}
+            onDeleteChat={handleDeleteChat}
             selectedLanguage={selectedLanguage}
             onLanguageChange={setSelectedLanguage}
           />
@@ -193,6 +248,20 @@ export default function Dashboard() {
           <div className="flex-1 flex flex-col">
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-4xl mx-auto">
+                {!activeChat && chats.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full text-center mt-20">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Civic-AI</h2>
+                    <p className="text-gray-600 max-w-md">
+                      Ask questions about government schemes, legal notices, or upload documents for instant analysis.
+                    </p>
+                  </div>
+                )}
+
                 {getCurrentChat()?.messages.map((message) => (
                   <ChatMessage key={message.id} message={message} />
                 ))}

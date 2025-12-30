@@ -140,7 +140,7 @@ export default function InputBar({
               <button
                 onClick={onClearImage}
                 disabled={disabled}
-                className="text-blue-600 hover:text-blue-800 disabled:text-blue-400"
+                className="text-blue-600 hover:text-blue-800 disabled:text-blue-400 cursor-pointer disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -161,7 +161,7 @@ export default function InputBar({
                 selectedImage 
                   ? 'bg-blue-100 hover:bg-blue-200 text-blue-600' 
                   : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-              } disabled:bg-gray-50 disabled:cursor-not-allowed`}
+              } disabled:bg-gray-50 disabled:cursor-not-allowed cursor-pointer`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -201,7 +201,7 @@ export default function InputBar({
                 <button
                   type="submit"
                   disabled={(!value.trim() && !selectedImage) || disabled}
-                  className="absolute right-2 bottom-2 w-8 h-8 bg-black hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  className="absolute right-2 bottom-2 w-8 h-8 bg-black hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -216,7 +216,7 @@ export default function InputBar({
                 type="button"
                 onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
                 disabled={disabled}
-                className="flex-shrink-0 w-12 h-10 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-xl flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="flex-shrink-0 w-12 h-10 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-xl flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer"
               >
                 <span className="text-xs font-semibold text-gray-700">
                   {getLanguageShort(selectedLanguage)}
@@ -235,7 +235,7 @@ export default function InputBar({
                         onLanguageChange(language);
                         setShowLanguageDropdown(false);
                       }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors duration-200 ${
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors duration-200 cursor-pointer ${
                         selectedLanguage === language ? 'bg-blue-50 text-blue-700' : 'text-gray-800'
                       }`}
                     >

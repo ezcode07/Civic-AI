@@ -37,7 +37,7 @@ export default function Navbar({ transparent = false }: NavbarProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 md:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2 cursor-pointer">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
               Civic AI
             </h1>
@@ -52,7 +52,7 @@ export default function Navbar({ transparent = false }: NavbarProps) {
                   <>
                     <Link
                       href="/dashboard"
-                      className={`px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 ${
+                      className={`px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer ${
                         pathname === "/dashboard"
                           ? "bg-gray-100 text-gray-900 border border-gray-300"
                           : "text-gray-700 hover:text-gray-900 border border-gray-300 hover:bg-white hover:border-gray-400 hover:shadow-sm"
@@ -75,7 +75,7 @@ export default function Navbar({ transparent = false }: NavbarProps) {
                       </div>
                       <button
                         onClick={logout}
-                        className="px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium text-gray-700 hover:text-gray-900 transition-colors duration-200"
+                        className="px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium text-gray-700 hover:text-gray-900 transition-colors duration-200 cursor-pointer"
                       >
                         Logout
                       </button>
@@ -86,7 +86,7 @@ export default function Navbar({ transparent = false }: NavbarProps) {
                   <>
                     <Link
                       href="/login"
-                      className={`px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 ${
+                      className={`px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer ${
                         pathname === "/login"
                           ? "bg-gray-100 text-gray-900 border border-gray-300"
                           : "text-gray-700 hover:text-gray-900 border border-gray-300 hover:bg-white hover:border-gray-400 hover:shadow-sm"
@@ -96,7 +96,7 @@ export default function Navbar({ transparent = false }: NavbarProps) {
                     </Link>
                     <Link
                       href="/signup"
-                      className={`px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 ${
+                      className={`px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer ${
                         pathname === "/signup"
                           ? "bg-gray-800 text-white shadow-lg"
                           : "bg-black text-white hover:bg-gray-800 hover:shadow-lg hover:scale-105"

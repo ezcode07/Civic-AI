@@ -78,7 +78,7 @@ export default function Home() {
                 {/* Primary CTA */}
                 <Link 
                   href="/dashboard" 
-                  className="group px-8 py-4 md:px-10 md:py-5 bg-black text-white rounded-full text-lg md:text-xl font-semibold hover:bg-gray-800 hover:shadow-xl hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 w-full sm:w-auto"
+                  className="group px-8 py-4 md:px-10 md:py-5 bg-black text-white rounded-full text-lg md:text-xl font-semibold hover:bg-gray-800 hover:shadow-xl hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 w-full sm:w-auto cursor-pointer"
                 >
                   <span className="flex items-center justify-center">
                     Try Civic-AI
@@ -91,7 +91,7 @@ export default function Home() {
                 {/* Secondary CTA */}
                 <a 
                   href="#contact" 
-                  className="px-8 py-4 md:px-10 md:py-5 text-gray-700 hover:text-gray-900 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full text-lg md:text-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 w-full sm:w-auto"
+                  className="px-8 py-4 md:px-10 md:py-5 text-gray-700 hover:text-gray-900 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full text-lg md:text-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 w-full sm:w-auto cursor-pointer"
                 >
                   Learn More
                 </a>
@@ -287,7 +287,7 @@ export default function Home() {
               </div>
               <button
                 type="submit"
-                className="group w-full bg-black text-white py-4 md:py-5 px-8 rounded-xl text-lg md:text-xl font-semibold hover:bg-gray-800 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                className="group w-full bg-black text-white py-4 md:py-5 px-8 rounded-xl text-lg md:text-xl font-semibold hover:bg-gray-800 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer"
               >
                 <span className="flex items-center justify-center">
                   Send Message
@@ -314,17 +314,17 @@ export default function Home() {
             <div>
               <h4 className="text-lg md:text-xl font-semibold mb-4 md:mb-6">Quick Links</h4>
               <ul className="space-y-3">
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg">Home</a></li>
-                <li><a href="#solution" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg">Features</a></li>
-                <li><a href="#contact" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg">Contact</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg cursor-pointer">Home</a></li>
+                <li><a href="#solution" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg cursor-pointer">Features</a></li>
+                <li><a href="#contact" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg cursor-pointer">Contact</a></li>
               </ul>
             </div>
             <div>
               <h4 className="text-lg md:text-xl font-semibold mb-4 md:mb-6">Support</h4>
               <ul className="space-y-3">
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg">Help Center</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg">Privacy Policy</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg">Terms of Service</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg cursor-pointer">Help Center</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg cursor-pointer">Privacy Policy</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors duration-200 text-base md:text-lg cursor-pointer">Terms of Service</a></li>
               </ul>
             </div>
           </div>
